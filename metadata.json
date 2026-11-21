@@ -1,0 +1,6 @@
+{
+  "name": "MimicVault — 3D Emotes NFT Marketplace",
+  "description": "Create, mint, and trade animated 3D character emote collectibles with 100 unique expressions per character and multi-platform export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
