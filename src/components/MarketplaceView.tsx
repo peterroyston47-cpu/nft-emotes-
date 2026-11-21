@@ -1,5 +1,13 @@
-import React, { useMemo, useState } from 'react';
-import { ArrowUpRight, Search, SlidersHorizontal } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ArrowUpRight,
+  Play,
+  Search,
+  SkipBack,
+  SkipForward,
+  SlidersHorizontal,
+  Square,
+} from 'lucide-react';
 import { CHARACTERS, PLATFORM_SPECS } from '../data/characters';
 import {
   CharacterId,
@@ -16,7 +24,7 @@ interface MarketplaceViewProps {
   emotes: EmoteDesign[];
   trades: TradeEvent[];
   userAddress: string;
-  onInspect: (emote: EmoteDesign) => void;
+  onInspect: (emote: EmoteDesign, autoPlay?: boolean) => void;
   onGoStudio: () => void;
   onGoDirectory: (charId?: CharacterId) => void;
 }
@@ -51,6 +59,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 }) => {
   const [heroMode, setHeroMode] = useState<'live3d' | 'pfp' | 'sheet'>('live3d');
   const [heroEmoteIdx, setHeroEmoteIdx] = useState(0);
+  const [heroAutoPlay, setHeroAutoPlay] = useState(false);
+  const [heroReelIdx, setHeroReelIdx] = useState(0);
+  const [heroStepMs, setHeroStepMs] = useState(1800);
 
   const [charFilter, setCharFilter] = useState<'all' | CharacterId>('all');
   const [catFilter, setCatFilter] = useState<'All' | EmoteCategory>('All');
@@ -61,13 +72,35 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
   const [page, setPage] = useState(1);
 
   const heroShowcaseEmotes = useMemo(() => {
-    const ids = ['macaque-36', 'macaque-51', 'macaque-66', 'macaque-52', 'macaque-91', 'macaque-81'];
+    const ids = [
+      'macaque-limited-king',
+      'tanuki-limited-disco',
+      'macaque-36',
+      'macaque-51',
+      'macaque-87',
+      'macaque-91',
+    ];
     return ids
       .map((id) => emotes.find((e) => e.id === id))
       .filter((e): e is EmoteDesign => Boolean(e));
   }, [emotes]);
 
-  const activeHeroEmote = heroShowcaseEmotes[heroEmoteIdx] || emotes[0];
+  useEffect(() => {
+    if (!heroAutoPlay || emotes.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setHeroReelIdx((prev) => (prev + 1) % emotes.length);
+    }, heroStepMs);
+    return () => window.clearInterval(timer);
+  }, [heroAutoPlay, emotes.length, heroStepMs]);
+
+  const toggleHeroAutoPlay = () => {
+    setHeroMode('live3d');
+    setHeroAutoPlay((prev) => !prev);
+  };
+
+  const activeHeroEmote = heroAutoPlay
+    ? emotes[heroReelIdx % Math.max(1, emotes.length)] || emotes[0]
+    : heroShowcaseEmotes[heroEmoteIdx] || emotes[0];
 
   const listedEmotes = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -135,26 +168,51 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <button
                 type="button"
+                onClick={toggleHeroAutoPlay}
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${
+                  heroAutoPlay
+                    ? 'bg-emerald-500 text-[#0C1115] hover:bg-emerald-400'
+                    : 'bg-[#F97316] text-[#0C1115] hover:bg-[#FB923C]'
+                }`}
+              >
+                {heroAutoPlay ? (
+                  <>
+                    <Square className="h-3.5 w-3.5 fill-current" />
+                    <span>
+                      Stop Auto-Play ({heroReelIdx + 1}/{emotes.length})
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-3.5 w-3.5 fill-current" />
+                    <span>Auto-Play All ({emotes.length})</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
                 onClick={onGoStudio}
-                className="px-5 py-2.5 rounded-lg bg-[#F97316] text-[#0C1115] text-sm font-semibold hover:bg-[#FB923C] transition-colors whitespace-nowrap"
+                className="px-4 py-2.5 rounded-lg border border-white/15 bg-[#19232C] text-white text-sm font-medium hover:bg-[#22303C] transition-colors whitespace-nowrap"
               >
                 Open 3D Studio
               </button>
               <button
                 type="button"
                 onClick={() => onGoDirectory('macaque')}
-                className="px-5 py-2.5 rounded-lg border border-white/15 bg-[#19232C] text-white text-sm font-medium hover:bg-[#22303C] transition-colors whitespace-nowrap"
+                className="px-4 py-2.5 rounded-lg border border-white/15 bg-[#19232C] text-white text-sm font-medium hover:bg-[#22303C] transition-colors whitespace-nowrap"
               >
-                Browse 100 Emotes / Character
+                100 Emotes / Char
               </button>
             </div>
           </div>
 
-          {/* Reference Sheet Strip */}
+          {/* Reference Sheet Strip / Active Auto-Play Reel Controls */}
           <div className="mt-8 pt-6 border-t border-white/10">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <span className="text-xs font-medium text-slate-400">
-                Flagship Character Reference · Ignis Macaque
+                {heroAutoPlay && activeHeroEmote
+                  ? `Auto-Playing · ${activeHeroEmote.code} ${activeHeroEmote.name}`
+                  : 'Flagship Character Reference · Ignis Macaque'}
               </span>
               <div className="flex items-center gap-1 bg-[#0C1115] p-1 rounded-lg border border-white/10">
                 <button
@@ -170,7 +228,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setHeroMode('pfp')}
+                  onClick={() => {
+                    setHeroAutoPlay(false);
+                    setHeroMode('pfp');
+                  }}
                   className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
                     heroMode === 'pfp'
                       ? 'bg-[#212D38] text-white'
@@ -181,7 +242,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setHeroMode('sheet')}
+                  onClick={() => {
+                    setHeroAutoPlay(false);
+                    setHeroMode('sheet');
+                  }}
                   className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
                     heroMode === 'sheet'
                       ? 'bg-[#212D38] text-white'
@@ -193,17 +257,70 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
               </div>
             </div>
 
+            {heroAutoPlay && (
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#0C1115] px-3 py-2">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setHeroReelIdx(
+                        (prev) => (prev - 1 + emotes.length) % emotes.length
+                      )
+                    }
+                    className="p-1 rounded bg-[#17212A] text-slate-200 hover:text-white"
+                    title="Previous Emote"
+                  >
+                    <SkipBack className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setHeroReelIdx((prev) => (prev + 1) % emotes.length)
+                    }
+                    className="p-1 rounded bg-[#17212A] text-slate-200 hover:text-white"
+                    title="Next Emote"
+                  >
+                    <SkipForward className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="ml-1 font-mono text-xs text-[#FB923C] tabular-nums">
+                    {heroReelIdx + 1} / {emotes.length}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-[11px] font-mono">
+                  {[
+                    { ms: 1200, label: '1.2s' },
+                    { ms: 1800, label: '1.8s' },
+                    { ms: 2600, label: '2.6s' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.ms}
+                      type="button"
+                      onClick={() => setHeroStepMs(opt.ms)}
+                      className={`px-2 py-0.5 rounded ${
+                        heroStepMs === opt.ms
+                          ? 'bg-[#212D38] text-white'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               {heroShowcaseEmotes.map((item, idx) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => {
+                    setHeroAutoPlay(false);
                     setHeroMode('live3d');
                     setHeroEmoteIdx(idx);
                   }}
                   className={`group flex flex-col items-center rounded-lg border p-1.5 text-left transition-colors ${
-                    heroMode === 'live3d' && heroEmoteIdx === idx
+                    !heroAutoPlay && heroMode === 'live3d' && heroEmoteIdx === idx
                       ? 'border-[#F97316] bg-[#F97316]/10'
                       : 'border-white/8 bg-[#17212A] hover:border-white/25'
                   }`}
@@ -228,6 +345,11 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             <EmoteCanvas3D
               characterId={activeHeroEmote.characterId}
               params={activeHeroEmote.params}
+              activeEmoteLabel={
+                heroAutoPlay
+                  ? `${activeHeroEmote.code} · ${activeHeroEmote.name} (${heroReelIdx + 1}/${emotes.length})`
+                  : `${activeHeroEmote.code} · ${activeHeroEmote.name}`
+              }
               showDock={true}
             />
           ) : (
@@ -314,39 +436,52 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
             </p>
           </div>
 
-          {/* Character Segmented Switch */}
-          <div className="flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[#121920] border border-white/10">
-            <button
-              type="button"
-              onClick={() => {
-                setCharFilter('all');
-                setPage(1);
-              }}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                charFilter === 'all'
-                  ? 'bg-[#F97316] text-[#0C1115] font-semibold'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-            >
-              All Characters
-            </button>
-            {CHARACTERS.map((c) => (
+          <div className="flex flex-wrap items-center gap-2.5">
+            {listedEmotes.length > 0 && (
               <button
-                key={c.id}
+                type="button"
+                onClick={() => onInspect(listedEmotes[0], true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#F97316]/60 bg-[#F97316]/15 text-xs font-semibold text-[#FB923C] hover:bg-[#F97316] hover:text-[#0C1115] transition-colors whitespace-nowrap"
+              >
+                <Play className="h-3.5 w-3.5 fill-current" />
+                <span>Auto-Play Listings ({listedEmotes.length})</span>
+              </button>
+            )}
+
+            {/* Character Segmented Switch */}
+            <div className="flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[#121920] border border-white/10">
+              <button
                 type="button"
                 onClick={() => {
-                  setCharFilter(c.id);
+                  setCharFilter('all');
                   setPage(1);
                 }}
                 className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                  charFilter === c.id
+                  charFilter === 'all'
                     ? 'bg-[#F97316] text-[#0C1115] font-semibold'
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
-                {c.name}
+                All Characters
               </button>
-            ))}
+              {CHARACTERS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => {
+                    setCharFilter(c.id);
+                    setPage(1);
+                  }}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
+                    charFilter === c.id
+                      ? 'bg-[#F97316] text-[#0C1115] font-semibold'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -455,7 +590,11 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                 <article
                   key={emote.id}
                   onClick={() => onInspect(emote)}
-                  className="group cursor-pointer rounded-xl border border-white/10 bg-[#121920] overflow-hidden transition-transform duration-200 hover:-translate-y-0.5 hover:border-white/25"
+                  className={`group cursor-pointer rounded-xl border bg-[#121920] overflow-hidden transition-transform duration-200 hover:-translate-y-0.5 ${
+                    emote.isLimitedEdition
+                      ? 'border-amber-400/60 hover:border-amber-300 shadow-lg shadow-amber-500/10'
+                      : 'border-white/10 hover:border-white/25'
+                  }`}
                 >
                   <div className="aspect-[4/3] w-full relative overflow-hidden">
                     <EmotePreviewThumb
@@ -463,11 +602,17 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
                       params={emote.params}
                       className="h-full w-full"
                     />
-                    <div className="absolute top-3 left-3 text-[11px] font-mono text-white/90 bg-black/55 px-2 py-0.5 rounded">
+                    <div className="absolute top-3 left-3 text-[11px] font-mono text-white/90 bg-black/65 px-2 py-0.5 rounded">
                       {emote.code}
                     </div>
-                    <div className="absolute top-3 right-3 text-[11px] font-medium text-slate-200 bg-black/55 px-2 py-0.5 rounded">
-                      {emote.rarity}
+                    <div
+                      className={`absolute top-3 right-3 text-[11px] font-semibold px-2 py-0.5 rounded ${
+                        emote.isLimitedEdition
+                          ? 'bg-amber-400 text-[#0C1115]'
+                          : 'text-slate-200 bg-black/55 font-medium'
+                      }`}
+                    >
+                      {emote.editionLabel || emote.rarity}
                     </div>
                   </div>
 

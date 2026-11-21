@@ -9,7 +9,7 @@ import { CharacterId, EmoteDesign, TradeEvent } from './types/emote';
 
 type ActiveTab = 'marketplace' | 'directory' | 'studio' | 'collection';
 
-const STORAGE_KEY = 'mimicvault_state_v1';
+const STORAGE_KEY = 'mimicvault_state_v4';
 const USER_ADDRESS = '0xA3F...88C1';
 
 export default function App() {
@@ -17,6 +17,7 @@ export default function App() {
   const [directoryChar, setDirectoryChar] = useState<CharacterId>('macaque');
   const [studioSeedEmote, setStudioSeedEmote] = useState<EmoteDesign | null>(null);
   const [inspectedEmoteId, setInspectedEmoteId] = useState<string | null>(null);
+  const [inspectAutoPlay, setInspectAutoPlay] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const [emotes, setEmotes] = useState<EmoteDesign[]>(() => {
@@ -282,7 +283,10 @@ export default function App() {
             emotes={emotes}
             trades={trades}
             userAddress={USER_ADDRESS}
-            onInspect={(e) => setInspectedEmoteId(e.id)}
+            onInspect={(e, autoPlay = false) => {
+              setInspectAutoPlay(autoPlay);
+              setInspectedEmoteId(e.id);
+            }}
             onGoStudio={() => {
               setStudioSeedEmote(null);
               setActiveTab('studio');
@@ -355,9 +359,15 @@ export default function App() {
       {/* Live 3D Inspect & Trade Modal */}
       <InspectTradeModal
         emote={inspectedEmote}
+        allEmotes={emotes}
+        initialAutoPlay={inspectAutoPlay}
         userAddress={USER_ADDRESS}
         walletEth={walletEth}
-        onClose={() => setInspectedEmoteId(null)}
+        onClose={() => {
+          setInspectAutoPlay(false);
+          setInspectedEmoteId(null);
+        }}
+        onSelectEmote={(id) => setInspectedEmoteId(id)}
         onBuy={handleBuy}
         onMintEdition={handleMintEdition}
         onToggleList={handleToggleList}

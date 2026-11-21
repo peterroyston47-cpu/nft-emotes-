@@ -1,9 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   Download,
   ExternalLink,
+  Gauge,
   Layers,
+  Play,
+  SkipBack,
+  SkipForward,
+  Square,
   Tag,
   Video,
   X,
@@ -15,9 +20,12 @@ import { EmotePreviewThumb } from './EmotePreviewThumb';
 
 interface InspectTradeModalProps {
   emote: EmoteDesign | null;
+  allEmotes: EmoteDesign[];
+  initialAutoPlay?: boolean;
   userAddress: string;
   walletEth: number;
   onClose: () => void;
+  onSelectEmote: (emoteId: string) => void;
   onBuy: (emoteId: string) => void;
   onMintEdition: (emoteId: string) => void;
   onToggleList: (emoteId: string, priceEth: number) => void;
@@ -27,9 +35,12 @@ interface InspectTradeModalProps {
 
 export const InspectTradeModal: React.FC<InspectTradeModalProps> = ({
   emote,
+  allEmotes,
+  initialAutoPlay = false,
   userAddress,
   walletEth,
   onClose,
+  onSelectEmote,
   onBuy,
   onMintEdition,
   onToggleList,
@@ -41,6 +52,47 @@ export const InspectTradeModal: React.FC<InspectTradeModalProps> = ({
   const [bidPrice, setBidPrice] = useState('0.35');
   const [exportNote, setExportNote] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+  const [autoPlayReel, setAutoPlayReel] = useState(initialAutoPlay);
+  const [reelScope, setReelScope] = useState<'char' | 'all'>('all');
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
+
+  useEffect(() => {
+    setAutoPlayReel(Boolean(emote && initialAutoPlay));
+  }, [Boolean(emote), initialAutoPlay]);
+
+  const playlist = useMemo(() => {
+    if (!emote) return allEmotes;
+    if (reelScope === 'char') {
+      return allEmotes.filter((e) => e.characterId === emote.characterId);
+    }
+    return allEmotes;
+  }, [allEmotes, emote?.characterId, reelScope, emote]);
+
+  const currentIdx = Math.max(
+    0,
+    playlist.findIndex((e) => e.id === emote?.id)
+  );
+
+  const stepEmote = (delta: number) => {
+    if (playlist.length === 0) return;
+    const next =
+      playlist[(currentIdx + delta + playlist.length) % playlist.length];
+    if (next) onSelectEmote(next.id);
+  };
+
+  useEffect(() => {
+    if (!emote || !autoPlayReel || playlist.length <= 1) return;
+    const intervalMs = Math.round(1800 / playbackSpeed);
+    const timer = window.setInterval(() => {
+      const idx = Math.max(
+        0,
+        playlist.findIndex((e) => e.id === emote.id)
+      );
+      const next = playlist[(idx + 1) % playlist.length];
+      if (next) onSelectEmote(next.id);
+    }, intervalMs);
+    return () => window.clearInterval(timer);
+  }, [emote, autoPlayReel, playlist, onSelectEmote, playbackSpeed]);
 
   useEffect(() => {
     if (!emote) return;
@@ -138,8 +190,130 @@ export const InspectTradeModal: React.FC<InspectTradeModalProps> = ({
               ref={canvasRef}
               characterId={emote.characterId}
               params={emote.params}
+              activeEmoteLabel={`${emote.code} · ${emote.name}`}
+              playbackSpeed={playbackSpeed}
               showDock={true}
             />
+          </div>
+
+          {/* 1-Click Auto-Play Reel Bar inside Modal */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/8 bg-[#131C24] px-3 py-2">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setAutoPlayReel(false);
+                  stepEmote(-1);
+                }}
+                className="p-1.5 rounded-lg border border-white/10 bg-[#1B2630] text-slate-200 hover:text-white"
+                title="Previous Emote"
+              >
+                <SkipBack className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setAutoPlayReel((v) => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+                  autoPlayReel
+                    ? 'bg-[#F97316] text-[#0C1115]'
+                    : 'bg-[#1B2630] text-white hover:bg-[#23313E]'
+                }`}
+              >
+                {autoPlayReel ? (
+                  <>
+                    <Square className="h-3 w-3 fill-current" />
+                    <span>Stop Reel</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-3 w-3 fill-current" />
+                    <span>Auto-Play All</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAutoPlayReel(false);
+                  stepEmote(1);
+                }}
+                className="p-1.5 rounded-lg border border-white/10 bg-[#1B2630] text-slate-200 hover:text-white"
+                title="Next Emote"
+              >
+                <SkipForward className="h-3.5 w-3.5" />
+              </button>
+              <span className="ml-1 font-mono text-xs text-slate-300 tabular-nums">
+                {currentIdx + 1} / {playlist.length}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1 bg-[#0C1115] p-0.5 rounded-lg border border-white/10 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setReelScope('char')}
+                className={`px-2 py-1 rounded-md transition-colors whitespace-nowrap ${
+                  reelScope === 'char'
+                    ? 'bg-[#212D38] text-white font-medium'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {charProfile.name.split(' ')[0]}
+              </button>
+              <button
+                type="button"
+                onClick={() => setReelScope('all')}
+                className={`px-2 py-1 rounded-md transition-colors whitespace-nowrap ${
+                  reelScope === 'all'
+                    ? 'bg-[#212D38] text-white font-medium'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                All ({allEmotes.length})
+              </button>
+            </div>
+          </div>
+
+          {/* 3D Animation Playback Speed Slider (0.5x – 2x) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/8 bg-[#131C24] px-3.5 py-2.5">
+            <div className="flex items-center gap-2 shrink-0">
+              <Gauge className="h-3.5 w-3.5 text-[#FB923C]" />
+              <span className="text-xs font-medium text-slate-200">
+                Playback Speed
+              </span>
+              <span className="font-mono text-xs font-semibold text-[#FB923C] tabular-nums w-11">
+                {playbackSpeed}x
+              </span>
+            </div>
+
+            <div className="flex flex-1 min-w-[140px] items-center gap-2.5">
+              <input
+                type="range"
+                min={0.5}
+                max={2}
+                step={0.25}
+                value={playbackSpeed}
+                onChange={(e) => setPlaybackSpeed(parseFloat(e.target.value))}
+                aria-label="Playback speed"
+                className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-[#1F2D3A] accent-[#F97316]"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 bg-[#0C1115] p-0.5 rounded-lg border border-white/10 text-[11px]">
+              {[0.5, 1, 2].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setPlaybackSpeed(preset)}
+                  className={`px-2 py-1 rounded-md font-mono transition-colors whitespace-nowrap ${
+                    playbackSpeed === preset
+                      ? 'bg-[#F97316] text-[#0C1115] font-semibold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {preset}x
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Platform Inline Size Previews */}

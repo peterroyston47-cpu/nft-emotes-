@@ -46,7 +46,10 @@ export type VfxProp =
   | 'fire'
   | 'question'
   | 'halo'
-  | 'starEyes';
+  | 'starEyes'
+  | 'sunglasses'
+  | 'kingThrone'
+  | 'discoClub';
 
 export type MotionPattern =
   | 'idle'
@@ -103,6 +106,8 @@ export interface EmoteDesign {
   listedForSale: boolean;
   likes: number;
   isUserCreated?: boolean;
+  isLimitedEdition?: boolean;
+  editionLabel?: string;
 }
 
 export interface CharacterPalette {

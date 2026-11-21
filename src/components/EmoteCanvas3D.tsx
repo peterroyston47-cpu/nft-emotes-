@@ -10,16 +10,21 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import {
+  Castle,
   ChevronDown,
   ChevronUp,
+  Disc3,
   Download,
+  Glasses,
   Pause,
   Play,
   RotateCw,
   Video,
 } from 'lucide-react';
 import { CHARACTERS } from '../data/characters';
+import { CastleBackdrop } from '../three/castleBackdrop';
 import { EmoteCharacterRig } from '../three/characterRig';
+import { DiscoClubBackdrop } from '../three/discoBackdrop';
 import {
   CharacterId,
   ExpressionParams,
@@ -36,8 +41,10 @@ export interface EmoteCanvasHandle {
 interface EmoteCanvas3DProps {
   characterId: CharacterId;
   params: ExpressionParams;
+  activeEmoteLabel?: string;
   lightingMood?: StudioLightingMood;
   onLightingChange?: (mood: StudioLightingMood) => void;
+  playbackSpeed?: number;
   showDock?: boolean;
   compact?: boolean;
   className?: string;
@@ -47,10 +54,10 @@ const CAMERA_PRESETS: Record<
   CameraPreset,
   { pos: [number, number, number]; target: [number, number, number]; label: string }
 > = {
-  hero: { pos: [0.95, 1.55, 3.35], target: [0, 1.25, 0], label: '3/4 Hero' },
-  portrait: { pos: [0, 1.7, 2.1], target: [0, 1.58, 0], label: 'Portrait' },
-  profile: { pos: [2.75, 1.48, 1.15], target: [0, 1.2, 0], label: 'Profile' },
-  turntable: { pos: [0, 1.65, 3.85], target: [0, 1.15, 0], label: 'Full Rig' },
+  hero: { pos: [1.02, 1.72, 4.05], target: [0, 1.28, 0], label: '3/4 Hero' },
+  portrait: { pos: [0, 1.72, 2.2], target: [0, 1.6, 0], label: 'Portrait' },
+  profile: { pos: [2.95, 1.56, 1.25], target: [0, 1.25, 0], label: 'Profile' },
+  turntable: { pos: [0, 1.78, 4.25], target: [0, 1.22, 0], label: 'Full Rig' },
 };
 
 const MOOD_COLORS: Record<
@@ -83,8 +90,10 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
     {
       characterId,
       params,
+      activeEmoteLabel,
       lightingMood = 'slate',
       onLightingChange,
+      playbackSpeed = 1,
       showDock = true,
       compact = false,
       className = '',
@@ -99,6 +108,12 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
 
     const playingRef = useRef(true);
     const autoRotateRef = useRef(false);
+    const forceShadesRef = useRef(false);
+    const showCastleRef = useRef(true);
+    const playbackSpeedRef = useRef(playbackSpeed);
+    playbackSpeedRef.current = Math.max(0.25, Math.min(3, playbackSpeed));
+    const simTimeRef = useRef(0);
+    const moodRef = useRef<StudioLightingMood>(lightingMood);
     const cameraPresetTargetRef = useRef<{
       pos: THREE.Vector3;
       target: THREE.Vector3;
@@ -115,6 +130,8 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
       camera?: THREE.PerspectiveCamera;
       controls?: OrbitControls;
       rig?: EmoteCharacterRig;
+      castle?: CastleBackdrop;
+      disco?: DiscoClubBackdrop;
       keyLight?: THREE.DirectionalLight;
       rimLight?: THREE.DirectionalLight;
       anisotropy: number;
@@ -122,9 +139,12 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
 
     const [playing, setPlaying] = useState(true);
     const [autoRotate, setAutoRotate] = useState(false);
+    const [forceShades, setForceShades] = useState(false);
+    const [showCastle, setShowCastle] = useState(true);
     const [activePreset, setActivePreset] = useState<CameraPreset>('hero');
     const [dockCollapsed, setDockCollapsed] = useState(false);
     const [mood, setMood] = useState<StudioLightingMood>(lightingMood);
+    moodRef.current = mood;
     const [contextLost, setContextLost] = useState(false);
     const [recording, setRecording] = useState(false);
 
@@ -253,14 +273,14 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
       const scene = new THREE.Scene();
       const moodSpec = MOOD_COLORS[mood];
       scene.background = new THREE.Color(moodSpec.bg);
-      scene.fog = new THREE.FogExp2(moodSpec.bg, 0.065);
+      scene.fog = new THREE.FogExp2(moodSpec.bg, 0.022);
 
       const pmrem = new THREE.PMREMGenerator(renderer);
       const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
       scene.environment = envTex;
       pmrem.dispose();
 
-      const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 40);
+      const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 120);
       camera.position.set(...CAMERA_PRESETS.hero.pos);
 
       const controls = new OrbitControls(camera, renderer.domElement);
@@ -308,6 +328,13 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
       }
 
       const anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
+      const castle = new CastleBackdrop(anisotropy);
+      scene.add(castle.group);
+
+      const disco = new DiscoClubBackdrop();
+      disco.group.visible = false;
+      scene.add(disco.group);
+
       const rig = new EmoteCharacterRig(characterId, anisotropy);
       scene.add(rig.root);
 
@@ -321,6 +348,8 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
         camera,
         controls,
         rig,
+        castle,
+        disco,
         keyLight,
         rimLight,
         anisotropy,
@@ -365,13 +394,40 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
       function tick() {
         if (disposed) return;
         const dt = clock.getDelta();
-        const elapsed = clock.getElapsedTime();
+        const speed = playbackSpeedRef.current;
+        const stepDt = Math.min(dt, 0.06) * speed;
+        if (playingRef.current) {
+          simTimeRef.current += stepDt;
+        }
+        const simElapsed = simTimeRef.current;
+
+        const isDiscoActive = paramsRef.current.vfxProp === 'discoClub';
+        const currentCastle = sceneRefs.current.castle;
+        const currentDisco = sceneRefs.current.disco;
+        if (currentCastle) {
+          currentCastle.group.visible = showCastleRef.current && !isDiscoActive;
+          if (currentCastle.group.visible) {
+            currentCastle.update(simElapsed, playingRef.current, moodRef.current);
+          }
+        }
+        if (currentDisco) {
+          currentDisco.group.visible = showCastleRef.current && isDiscoActive;
+          if (currentDisco.group.visible) {
+            currentDisco.update(simElapsed, playingRef.current);
+          }
+        }
 
         const currentRig = sceneRefs.current.rig;
         if (currentRig) {
-          currentRig.update(paramsRef.current, dt, elapsed, playingRef.current);
+          currentRig.update(
+            paramsRef.current,
+            stepDt,
+            simElapsed,
+            playingRef.current,
+            forceShadesRef.current
+          );
           if (autoRotateRef.current) {
-            currentRig.root.rotation.y += dt * 0.65;
+            currentRig.root.rotation.y += stepDt * 0.65;
           } else {
             currentRig.root.rotation.y = THREE.MathUtils.damp(
               currentRig.root.rotation.y,
@@ -421,6 +477,8 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
         renderer.domElement.removeEventListener('webglcontextlost', handleLost);
         renderer.domElement.removeEventListener('webglcontextrestored', handleRestored);
         sceneRefs.current.rig?.dispose();
+        sceneRefs.current.castle?.dispose();
+        sceneRefs.current.disco?.dispose();
         envTex.dispose();
         controls.dispose();
         renderer.dispose();
@@ -438,16 +496,18 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
       sceneRefs.current.rig = nextRig;
     }, [characterId]);
 
-    // Update studio lighting mood dynamically
+    // Update studio lighting mood & disco club night atmosphere dynamically
+    const isDiscoScene = params.vfxProp === 'discoClub';
     useEffect(() => {
       const { scene, keyLight, rimLight } = sceneRefs.current;
       if (!scene || !keyLight || !rimLight) return;
       const spec = MOOD_COLORS[mood];
-      scene.background = new THREE.Color(spec.bg);
-      scene.fog = new THREE.FogExp2(spec.bg, 0.065);
-      keyLight.color.set(spec.key);
-      rimLight.color.set(spec.rim);
-    }, [mood]);
+      const bgHex = isDiscoScene ? '#090518' : spec.bg;
+      scene.background = new THREE.Color(bgHex);
+      scene.fog = new THREE.FogExp2(bgHex, isDiscoScene ? 0.024 : 0.022);
+      keyLight.color.set(isDiscoScene ? '#FDF2F8' : spec.key);
+      rimLight.color.set(isDiscoScene ? '#22D3EE' : spec.rim);
+    }, [mood, isDiscoScene]);
 
     const handlePreset = (preset: CameraPreset) => {
       setActivePreset(preset);
@@ -465,6 +525,16 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
     const toggleAutoRotate = () => {
       autoRotateRef.current = !autoRotateRef.current;
       setAutoRotate(autoRotateRef.current);
+    };
+
+    const toggleForceShades = () => {
+      forceShadesRef.current = !forceShadesRef.current;
+      setForceShades(forceShadesRef.current);
+    };
+
+    const toggleCastle = () => {
+      showCastleRef.current = !showCastleRef.current;
+      setShowCastle(showCastleRef.current);
     };
 
     const handleQuickSnapshot = () => {
@@ -552,14 +622,27 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
 
         {/* Minimal Top-Left Character Label (non-blocking) */}
         {!compact && (
-          <div className="pointer-events-none absolute top-3.5 left-4 z-10 flex items-center gap-2 text-xs text-slate-200/90">
+          <div className="pointer-events-none absolute top-3.5 left-4 z-10 flex flex-wrap items-center gap-2 text-xs text-slate-200/90 pr-4">
             <span className="font-display font-semibold text-white">
               {charProfile.name}
             </span>
-            <span aria-hidden="true" className="text-slate-400">
-              ·
-            </span>
-            <span className="text-slate-300">Drag to orbit · Scroll to zoom</span>
+            {activeEmoteLabel ? (
+              <>
+                <span aria-hidden="true" className="text-slate-400">
+                  ·
+                </span>
+                <span className="font-mono text-[#FB923C] font-medium">
+                  {activeEmoteLabel}
+                </span>
+              </>
+            ) : (
+              <>
+                <span aria-hidden="true" className="text-slate-400">
+                  ·
+                </span>
+                <span className="text-slate-300">Drag to orbit · Scroll to zoom</span>
+              </>
+            )}
           </div>
         )}
 
@@ -640,6 +723,38 @@ export const EmoteCanvas3D = forwardRef<EmoteCanvasHandle, EmoteCanvas3DProps>(
                       <Play className="h-3.5 w-3.5" />
                     )}
                     <span>{playing ? 'Pause' : 'Play'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={toggleForceShades}
+                    className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                      forceShades || params.vfxProp === 'sunglasses'
+                        ? 'border-[#F97316]/60 bg-[#F97316]/15 text-[#FB923C]'
+                        : 'border-white/10 bg-[#162029] text-slate-200 hover:bg-[#1E2B37]'
+                    }`}
+                    title="Wear Sunglasses on Character"
+                  >
+                    <Glasses className="h-3.5 w-3.5" />
+                    <span>Shades</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={toggleCastle}
+                    className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                      showCastle
+                        ? 'border-[#F97316]/60 bg-[#F97316]/15 text-[#FB923C]'
+                        : 'border-white/10 bg-[#162029] text-slate-200 hover:bg-[#1E2B37]'
+                    }`}
+                    title={isDiscoScene ? 'Toggle Clubbing Disco Stage' : 'Toggle Royal Castle Backdrop'}
+                  >
+                    {isDiscoScene ? (
+                      <Disc3 className="h-3.5 w-3.5" />
+                    ) : (
+                      <Castle className="h-3.5 w-3.5" />
+                    )}
+                    <span>{isDiscoScene ? 'Club' : 'Castle'}</span>
                   </button>
 
                   <button

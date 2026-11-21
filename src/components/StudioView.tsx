@@ -58,6 +58,9 @@ const VFX_PROPS: Array<{ id: VfxProp; label: string }> = [
   { id: 'question', label: 'Question ?' },
   { id: 'halo', label: 'Golden Halo' },
   { id: 'starEyes', label: 'Star Eyes' },
+  { id: 'sunglasses', label: 'Sunglasses' },
+  { id: 'kingThrone', label: 'King Throne & Crown' },
+  { id: 'discoClub', label: 'Disco Hair & Club' },
 ];
 
 const MOTION_PATTERNS: Array<{ id: MotionPattern; label: string }> = [

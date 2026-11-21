@@ -31,11 +31,15 @@ export const EmotePreviewThumb: React.FC<EmotePreviewThumbProps> = ({
   const headTiltDeg = (params.headTiltZ * 180) / Math.PI * 0.45;
   const angerFlush = params.faceTintIntensity || 0;
 
+  const isDisco = params.vfxProp === 'discoClub';
+
   return (
     <div
       className={`relative overflow-hidden select-none ${className}`}
       style={{
-        background: `radial-gradient(circle at 50% 35%, ${studioBg}ee 0%, #141C23 100%)`,
+        background: isDisco
+          ? 'radial-gradient(circle at 50% 30%, #701A75 0%, #1E1B4B 55%, #090518 100%)'
+          : `radial-gradient(circle at 50% 35%, ${studioBg}ee 0%, #141C23 100%)`,
       }}
     >
       <svg
@@ -53,8 +57,38 @@ export const EmotePreviewThumb: React.FC<EmotePreviewThumbProps> = ({
           </clipPath>
         </defs>
 
+        {/* Disco Club Beams & Mirror Ball in Background */}
+        {isDisco && (
+          <g>
+            <polygon points="60,8 4,116 32,116" fill="#EC4899" opacity="0.22" />
+            <polygon points="60,8 88,116 116,116" fill="#06B6D4" opacity="0.22" />
+            <polygon points="60,8 44,116 76,116" fill="#A855F7" opacity="0.18" />
+            <line x1="98" y1="0" x2="98" y2="14" stroke="#94A3B8" strokeWidth="1.4" />
+            <circle cx="98" cy="18" r="8.5" fill="#E2E8F0" stroke="#CBD5E1" strokeWidth="1" />
+            <path d="M 90 18 H 106 M 98 9.5 V 26.5 M 92 13 H 104 M 92 23 H 104" stroke="#475569" strokeWidth="0.7" />
+          </g>
+        )}
+
         {/* Subtle turntable pedestal rim at bottom */}
-        <ellipse cx="60" cy="113" rx="38" ry="5.5" fill="#0F172A" opacity="0.55" />
+        <ellipse
+          cx="60"
+          cy="113"
+          rx="38"
+          ry="5.5"
+          fill={isDisco ? '#EC4899' : '#0F172A'}
+          opacity={isDisco ? '0.45' : '0.55'}
+        />
+
+        {/* Royal Gold & Crimson Throne Backrest when kingThrone */}
+        {params.vfxProp === 'kingThrone' && (
+          <g>
+            <rect x="20" y="18" width="80" height="86" rx="14" fill="#9F1239" stroke="#F59E0B" strokeWidth="4" />
+            <path d="M 32 18 Q 60 2 88 18" fill="#9F1239" stroke="#F59E0B" strokeWidth="3.5" />
+            <circle cx="60" cy="11" r="4" fill="#E11D48" stroke="#FBBF24" strokeWidth="1.5" />
+            <rect x="16" y="76" width="12" height="22" rx="4" fill="#F59E0B" />
+            <rect x="92" y="76" width="12" height="22" rx="4" fill="#F59E0B" />
+          </g>
+        )}
 
         {/* Species Tail Silhouette */}
         {characterId === 'macaque' && (
@@ -86,22 +120,48 @@ export const EmotePreviewThumb: React.FC<EmotePreviewThumbProps> = ({
           />
         )}
 
-        {/* Legs / Feet */}
-        <rect x="44" y="103" width="11" height="10" rx="5" fill={primaryFur} />
-        <rect x="65" y="103" width="11" height="10" rx="5" fill={primaryFur} />
-        <ellipse cx="49" cy="112" rx="8" ry="4" fill={secondarySkin} />
-        <ellipse cx="71" cy="112" rx="8" ry="4" fill={secondarySkin} />
+        {/* Chubby Stubby Legs / Feet */}
+        <rect x="42" y="102" width="13" height="10" rx="6" fill={primaryFur} />
+        <rect x="65" y="102" width="13" height="10" rx="6" fill={primaryFur} />
+        <ellipse cx="48.5" cy="112" rx="9" ry="4.4" fill={secondarySkin} />
+        <ellipse cx="71.5" cy="112" rx="9" ry="4.4" fill={secondarySkin} />
 
-        {/* Shoulders / Torso */}
+        {/* Chubby Plush Shoulders / Torso */}
         <path
-          d="M 30 108 C 32 86, 88 86, 90 108 Z"
+          d="M 24 109 C 24 81, 96 81, 96 109 Z"
           fill={primaryFur}
         />
         <path
-          d="M 45 108 C 47 91, 73 91, 75 108 Z"
+          d="M 41 109 C 42 88, 78 88, 79 109 Z"
           fill={secondarySkin}
-          opacity="0.88"
+          opacity="0.9"
         />
+
+        {/* King Fashion Crimson Mantle, Ermine Collar & Gold Medallion */}
+        {params.vfxProp === 'kingThrone' && (
+          <g>
+            <path d="M 21 110 Q 25 84 44 86 L 76 86 Q 95 84 99 110 Z" fill="#9F1239" opacity="0.92" />
+            <ellipse cx="60" cy="87" rx="23" ry="6.5" fill="#F8FAFC" stroke="#CBD5E1" strokeWidth="0.8" />
+            <circle cx="48" cy="87" r="1.4" fill="#1E293B" />
+            <circle cx="60" cy="88" r="1.4" fill="#1E293B" />
+            <circle cx="72" cy="87" r="1.4" fill="#1E293B" />
+            <path d="M 44 89 Q 60 104 76 89" fill="none" stroke="#FBBF24" strokeWidth="2.8" />
+            <circle cx="60" cy="100" r="4.5" fill="#E11D48" stroke="#FBBF24" strokeWidth="1.6" />
+          </g>
+        )}
+
+        {/* Shimmering 70s Open-Collar Disco Shirt & Gold Star Medallion */}
+        {isDisco && (
+          <g>
+            <path d="M 24 110 C 26 83, 45 84, 52 88 L 60 102 L 68 88 C 75 84, 94 83, 96 110 Z" fill="#C026D3" />
+            <polygon points="44,85 57,89 51,99 39,93" fill="#F8FAFC" />
+            <polygon points="76,85 63,89 69,99 81,93" fill="#F8FAFC" />
+            <rect x="27" y="103" width="66" height="4" rx="2" fill="#22D3EE" />
+            <rect x="55" y="102" width="10" height="6" rx="1.5" fill="#FACC15" />
+            <path d="M 52 87 Q 60 98 68 87" fill="none" stroke="#FACC15" strokeWidth="2" />
+            <polygon points="60,92 62,96 66,97 63,100 64,104 60,102 56,104 57,100 54,97 58,96" fill="#FACC15" />
+          </g>
+        )}
 
         {/* Head Group with Tilt */}
         <g transform={`translate(60, 58) rotate(${headTiltDeg.toFixed(1)})`}>
@@ -146,33 +206,46 @@ export const EmotePreviewThumb: React.FC<EmotePreviewThumbProps> = ({
             </>
           )}
 
-          {/* Cranium */}
-          <circle cx="0" cy="0" r="31" fill={primaryFur} />
-          <circle cx="0" cy="0" r="31" fill={`url(#fur-${uid})`} opacity="0.35" />
+          {/* 70s Voluminous Disco Afro Behind/Around Head */}
+          {isDisco && (
+            <g>
+              <circle cx="0" cy="-16" r="35" fill="#26152F" />
+              <circle cx="-26" cy="-12" r="15" fill="#3B1D4A" />
+              <circle cx="26" cy="-12" r="15" fill="#3B1D4A" />
+              <circle cx="-16" cy="-34" r="15" fill="#26152F" />
+              <circle cx="16" cy="-34" r="15" fill="#26152F" />
+              <circle cx="0" cy="-38" r="16" fill="#3B1D4A" />
+              <polygon points="24,-34 26,-38 30,-37 27,-34 28,-30 24,-32 20,-30 21,-34 18,-37 22,-38" fill="#FACC15" />
+            </g>
+          )}
+
+          {/* Chubby Cute Cranium */}
+          <ellipse cx="0" cy="0" rx="33" ry="31" fill={primaryFur} />
+          <ellipse cx="0" cy="0" rx="33" ry="31" fill={`url(#fur-${uid})`} opacity="0.35" />
 
           {/* Anger flush tint */}
           {angerFlush > 0 && (
-            <circle cx="0" cy="0" r="30" fill="#E11D48" opacity={angerFlush * 0.35} />
+            <ellipse cx="0" cy="0" rx="32" ry="30" fill="#E11D48" opacity={angerFlush * 0.35} />
           )}
 
-          {/* Face Mask & Muzzle */}
-          <ellipse cx="0" cy="4" rx="23" ry="20" fill={secondarySkin} />
+          {/* Face Mask & Plush Muzzle */}
+          <ellipse cx="0" cy="4" rx="25" ry="20.5" fill={secondarySkin} />
           <ellipse
             cx="0"
             cy="14"
-            rx={17 + params.cheekPuff * 4}
-            ry={12 + params.cheekPuff * 2}
+            rx={19 + params.cheekPuff * 4.5}
+            ry={12.5 + params.cheekPuff * 2.5}
             fill={secondarySkin}
           />
           {angerFlush > 0 && (
-            <ellipse cx="0" cy="4" rx="22" ry="19" fill="#E11D48" opacity={angerFlush * 0.28} />
+            <ellipse cx="0" cy="4" rx="24" ry="19.5" fill="#E11D48" opacity={angerFlush * 0.28} />
           )}
 
-          {/* Cheek Blush */}
+          {/* Rosy Chibi Cheek Blush */}
           {params.blush > 0.05 && (
             <>
-              <ellipse cx="-16" cy="9" rx="5.5" ry="3" fill="#FB7185" opacity={params.blush * 0.72} />
-              <ellipse cx="16" cy="9" rx="5.5" ry="3" fill="#FB7185" opacity={params.blush * 0.72} />
+              <ellipse cx="-17.5" cy="9" rx="6.2" ry="3.5" fill="#FB7185" opacity={params.blush * 0.78} />
+              <ellipse cx="17.5" cy="9" rx="6.2" ry="3.5" fill="#FB7185" opacity={params.blush * 0.78} />
             </>
           )}
 
@@ -343,6 +416,33 @@ export const EmotePreviewThumb: React.FC<EmotePreviewThumbProps> = ({
               <line x1="38" y1="-26" x2="46" y2="-32" />
               <line x1="-40" y1="4" x2="-48" y2="6" />
               <line x1="40" y1="4" x2="48" y2="6" />
+            </g>
+          )}
+          {params.vfxProp === 'sunglasses' && (
+            <g>
+              {/* Temple hints & gold bridge */}
+              <line x1="-26" y1="-4" x2="-20" y2="-4" stroke="#111827" strokeWidth="2.4" strokeLinecap="round" />
+              <line x1="20" y1="-4" x2="26" y2="-4" stroke="#111827" strokeWidth="2.4" strokeLinecap="round" />
+              <path d="M -3 -4 Q 0 -6 3 -4" fill="none" stroke="#FBBF24" strokeWidth="2.2" strokeLinecap="round" />
+              {/* Left & right sculpted frames + dark glossy lenses */}
+              <rect x="-21" y="-9.5" width="18" height="13.5" rx="4.5" fill="#090D16" stroke="#111827" strokeWidth="2.4" />
+              <rect x="3" y="-9.5" width="18" height="13.5" rx="4.5" fill="#090D16" stroke="#111827" strokeWidth="2.4" />
+              {/* Crisp comic diagonal reflections */}
+              <line x1="-17" y1="-6.5" x2="-13" y2="0.5" stroke="#FFFFFF" strokeWidth="1.6" strokeLinecap="round" opacity="0.55" />
+              <line x1="7" y1="-6.5" x2="11" y2="0.5" stroke="#FFFFFF" strokeWidth="1.6" strokeLinecap="round" opacity="0.55" />
+            </g>
+          )}
+          {params.vfxProp === 'kingThrone' && (
+            <g transform="translate(0, -31)">
+              <ellipse cx="0" cy="4" rx="20" ry="6" fill="#991B1B" />
+              <polygon points="-20,4 -23,-11 -10,-3 0,-15 10,-3 23,-11 20,4" fill="#FBBF24" stroke="#B45309" strokeWidth="1.2" />
+              <ellipse cx="0" cy="5" rx="21" ry="4" fill="#F8FAFC" />
+              <circle cx="-11" cy="5" r="1.2" fill="#1E293B" />
+              <circle cx="0" cy="5" r="1.2" fill="#1E293B" />
+              <circle cx="11" cy="5" r="1.2" fill="#1E293B" />
+              <circle cx="0" cy="-2" r="2.6" fill="#E11D48" />
+              <circle cx="-11" cy="-1" r="2" fill="#2563EB" />
+              <circle cx="11" cy="-1" r="2" fill="#2563EB" />
             </g>
           )}
         </g>

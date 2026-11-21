@@ -1,10 +1,14 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   Download,
+  Play,
   Search,
+  SkipBack,
+  SkipForward,
   Sliders,
   Sparkles,
+  Square,
   Video,
 } from 'lucide-react';
 import { CHARACTERS, PLATFORM_SPECS } from '../data/characters';
@@ -43,6 +47,9 @@ export const Directory100View: React.FC<Directory100ViewProps> = ({
     `${initialCharacterId}-36`
   );
   const [exportStatus, setExportStatus] = useState<string | null>(null);
+  const [autoPlayAll, setAutoPlayAll] = useState(false);
+  const [playScope, setPlayScope] = useState<'filtered' | 'all400'>('filtered');
+  const [stepMs, setStepMs] = useState<number>(1800);
   const canvasRef = useRef<EmoteCanvasHandle | null>(null);
 
   const charEmotes = useMemo(
@@ -66,15 +73,56 @@ export const Directory100View: React.FC<Directory100ViewProps> = ({
     });
   }, [charEmotes, selectedCategory, search]);
 
+  const playlist = useMemo(() => {
+    if (playScope === 'all400') return emotes;
+    return filteredEmotes.length > 0 ? filteredEmotes : charEmotes;
+  }, [playScope, emotes, filteredEmotes, charEmotes]);
+
   const activeEmote =
-    charEmotes.find((e) => e.id === selectedEmoteId) ||
+    (playScope === 'all400'
+      ? emotes.find((e) => e.id === selectedEmoteId)
+      : charEmotes.find((e) => e.id === selectedEmoteId)) ||
     filteredEmotes[0] ||
     charEmotes[0];
 
+  const activePlaylistIdx = Math.max(
+    0,
+    playlist.findIndex((e) => e.id === activeEmote?.id)
+  );
+
   const charProfile =
-    CHARACTERS.find((c) => c.id === selectedChar) || CHARACTERS[0];
+    CHARACTERS.find((c) => c.id === (activeEmote?.characterId || selectedChar)) ||
+    CHARACTERS[0];
+
+  const stepReel = (delta: number) => {
+    if (playlist.length === 0) return;
+    const nextIdx =
+      (activePlaylistIdx + delta + playlist.length) % playlist.length;
+    const next = playlist[nextIdx];
+    if (!next) return;
+    if (next.characterId !== selectedChar) {
+      setSelectedChar(next.characterId);
+    }
+    setSelectedEmoteId(next.id);
+  };
+
+  useEffect(() => {
+    if (!autoPlayAll || playlist.length <= 1) return;
+    const timer = window.setInterval(() => {
+      const curIdx = playlist.findIndex((e) => e.id === activeEmote?.id);
+      const nextIdx = (Math.max(0, curIdx) + 1) % playlist.length;
+      const next = playlist[nextIdx];
+      if (!next) return;
+      if (next.characterId !== selectedChar) {
+        setSelectedChar(next.characterId);
+      }
+      setSelectedEmoteId(next.id);
+    }, stepMs);
+    return () => window.clearInterval(timer);
+  }, [autoPlayAll, playlist, activeEmote?.id, selectedChar, stepMs]);
 
   const handleCharSwitch = (id: CharacterId) => {
+    setAutoPlayAll(false);
     setSelectedChar(id);
     const first = emotes.find((e) => e.characterId === id);
     if (first) setSelectedEmoteId(first.id);
@@ -122,37 +170,166 @@ export const Directory100View: React.FC<Directory100ViewProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-1.5 p-1 rounded-xl border border-white/10 bg-[#121920]">
-          {CHARACTERS.map((char) => {
-            const count = emotes.filter((e) => e.characterId === char.id).length;
-            return (
-              <button
-                key={char.id}
-                type="button"
-                onClick={() => handleCharSwitch(char.id)}
-                className={`px-3.5 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
-                  selectedChar === char.id
-                    ? 'bg-[#F97316] text-[#0C1115] font-semibold'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                {char.name} ({count})
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setAutoPlayAll((v) => !v)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+              autoPlayAll
+                ? 'bg-[#F97316] text-[#0C1115] shadow-lg'
+                : 'border border-[#F97316]/60 bg-[#F97316]/15 text-[#FB923C] hover:bg-[#F97316] hover:text-[#0C1115]'
+            }`}
+          >
+            {autoPlayAll ? (
+              <>
+                <Square className="h-3.5 w-3.5 fill-current" />
+                <span>
+                  Stop Auto-Play ({activePlaylistIdx + 1}/{playlist.length})
+                </span>
+              </>
+            ) : (
+              <>
+                <Play className="h-3.5 w-3.5 fill-current" />
+                <span>Auto-Play All ({playlist.length})</span>
+              </>
+            )}
+          </button>
+
+          <div className="flex flex-wrap gap-1.5 p-1 rounded-xl border border-white/10 bg-[#121920]">
+            {CHARACTERS.map((char) => {
+              const count = emotes.filter((e) => e.characterId === char.id).length;
+              return (
+                <button
+                  key={char.id}
+                  type="button"
+                  onClick={() => handleCharSwitch(char.id)}
+                  className={`px-3.5 py-2 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
+                    selectedChar === char.id
+                      ? 'bg-[#F97316] text-[#0C1115] font-semibold'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {char.name} ({count})
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Live 3D Stage + Active Expression Inspector */}
       {activeEmote && (
         <section className="grid gap-6 lg:grid-cols-[1.25fr_1fr] items-stretch">
-          <div className="h-[380px] lg:h-[440px]">
-            <EmoteCanvas3D
-              ref={canvasRef}
-              characterId={activeEmote.characterId}
-              params={activeEmote.params}
-              showDock={true}
-            />
+          <div className="flex flex-col gap-3">
+            <div className="h-[380px] lg:h-[440px]">
+              <EmoteCanvas3D
+                ref={canvasRef}
+                characterId={activeEmote.characterId}
+                params={activeEmote.params}
+                activeEmoteLabel={`${activeEmote.code} · ${activeEmote.name} (${activePlaylistIdx + 1}/${playlist.length})`}
+                showDock={true}
+              />
+            </div>
+
+            {/* 1-Click Auto-Play Reel Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#121920] px-3.5 py-2.5">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAutoPlayAll(false);
+                    stepReel(-1);
+                  }}
+                  className="p-1.5 rounded-lg border border-white/10 bg-[#162029] text-slate-200 hover:text-white"
+                  title="Previous Emote"
+                >
+                  <SkipBack className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAutoPlayAll((v) => !v)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+                    autoPlayAll
+                      ? 'bg-[#F97316] text-[#0C1115]'
+                      : 'bg-[#1B2630] text-white hover:bg-[#23313E]'
+                  }`}
+                >
+                  {autoPlayAll ? (
+                    <>
+                      <Square className="h-3 w-3 fill-current" />
+                      <span>Pause Reel</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-3 w-3 fill-current" />
+                      <span>Auto-Play All</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAutoPlayAll(false);
+                    stepReel(1);
+                  }}
+                  className="p-1.5 rounded-lg border border-white/10 bg-[#162029] text-slate-200 hover:text-white"
+                  title="Next Emote"
+                >
+                  <SkipForward className="h-3.5 w-3.5" />
+                </button>
+                <span className="ml-1.5 font-mono text-xs text-slate-300 tabular-nums">
+                  {activePlaylistIdx + 1} / {playlist.length}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 bg-[#0C1115] p-0.5 rounded-lg border border-white/10 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setPlayScope('filtered')}
+                    className={`px-2 py-1 rounded-md transition-colors whitespace-nowrap ${
+                      playScope === 'filtered'
+                        ? 'bg-[#212D38] text-white font-medium'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {charProfile.name.split(' ')[0]} ({filteredEmotes.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlayScope('all400')}
+                    className={`px-2 py-1 rounded-md transition-colors whitespace-nowrap ${
+                      playScope === 'all400'
+                        ? 'bg-[#212D38] text-white font-medium'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    All 400
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1 bg-[#0C1115] p-0.5 rounded-lg border border-white/10 text-[11px] font-mono">
+                  {[
+                    { ms: 1200, label: '1.2s' },
+                    { ms: 1800, label: '1.8s' },
+                    { ms: 2600, label: '2.6s' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.ms}
+                      type="button"
+                      onClick={() => setStepMs(opt.ms)}
+                      className={`px-2 py-1 rounded-md transition-colors ${
+                        stepMs === opt.ms
+                          ? 'bg-[#212D38] text-[#FB923C]'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#121920] p-6 gap-5">
@@ -314,7 +491,10 @@ export const Directory100View: React.FC<Directory100ViewProps> = ({
               <button
                 key={emote.id}
                 type="button"
-                onClick={() => setSelectedEmoteId(emote.id)}
+                onClick={() => {
+                  setAutoPlayAll(false);
+                  setSelectedEmoteId(emote.id);
+                }}
                 className={`group flex flex-col rounded-xl border p-2 text-left transition-all ${
                   isSelected
                     ? 'border-[#F97316] bg-[#F97316]/12 shadow-lg'
